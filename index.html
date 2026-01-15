@@ -1,0 +1,1532 @@
+<!--
+================================================================================
+ VEX SCOUT v11 - FRONTEND USER INTERFACE
+ Fully Commented for VEX Think Award Submission
+================================================================================
+
+ WHAT THIS FILE DOES:
+ --------------------
+ This is the frontend (user interface) for VEX Scout. It's a single-page
+ React application that communicates with the Python backend via HTTP API calls.
+
+ NEW v11 FEATURES:
+ -----------------
+ 1. Manual Rating Stars: Click 1-10 to rate teams based on observation
+ 2. Head-to-Head Entry: Input elim match results (winner/loser/round)
+ 3. Elim Performance Display: Shows elim record and "chokes in elims" label
+================================================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VEX Scout v11 - Eye Test Edition</title>
+    
+    <!-- React Framework - for building reactive user interfaces -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel - compiles JSX (React's HTML-like syntax) in the browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        /*
+         * CSS VARIABLES (Custom Properties)
+         * These define our color scheme for easy theming.
+         * Dark theme is optimized for competition venue lighting.
+         */
+        :root {
+            --bg: #0a0a1a;           /* Background color - very dark blue */
+            --card: rgba(20,20,40,0.95);  /* Card background - slightly lighter */
+            --accent: #6366f1;       /* Primary accent - indigo */
+            --green: #10b981;        /* Success/positive - emerald */
+            --red: #ef4444;          /* Error/negative - red */
+            --yellow: #f59e0b;       /* Warning - amber */
+            --blue: #3b82f6;         /* Info - blue */
+            --purple: #8b5cf6;       /* Secondary accent - violet */
+            --cyan: #06b6d4;         /* Tertiary - cyan */
+            --orange: #f97316;       /* Highlight - orange (used for manual ratings) */
+            --text: #e2e8f0;         /* Primary text - light gray */
+            --dim: #94a3b8;          /* Secondary text - dimmed */
+            --border: rgba(255,255,255,0.08);  /* Border color - subtle */
+        }
+        
+        /* Reset default browser styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        /* Body styling - gradient background */
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(145deg, var(--bg), #1a1a3e, #0f172a);
+            min-height: 100vh;
+            color: var(--text);
+        }
+        
+        /* Main app container */
+        .app {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+        
+        /* Header section */
+        .header {
+            text-align: center;
+            padding: 12px;
+        }
+        
+        /* Title with gradient text effect */
+        .title {
+            font-size: 26px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #10b981, #06b6d4, #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: inline;
+        }
+        
+        /* Version badge */
+        .version {
+            background: var(--orange);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-size: 9px;
+            font-weight: 600;
+            margin-left: 6px;
+        }
+        
+        /* Event name badge */
+        .event-badge {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 4px 12px;
+            background: var(--card);
+            border: 1px solid var(--accent);
+            border-radius: 12px;
+            font-size: 10px;
+        }
+        
+        /* Card component - used for main content areas */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 10px;
+        }
+        
+        /* Tab navigation bar */
+        .tabs {
+            display: flex;
+            gap: 2px;
+            padding: 3px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        
+        /* Individual tab button */
+        .tab {
+            padding: 6px 10px;
+            border: none;
+            background: transparent;
+            color: var(--dim);
+            font-size: 9px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 5px;
+            white-space: nowrap;
+        }
+        
+        .tab:hover {
+            background: rgba(40,40,70,0.5);
+            color: var(--text);
+        }
+        
+        /* Active tab styling */
+        .tab.active {
+            background: var(--accent);
+            color: white;
+        }
+        
+        .tab:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        
+        /* Form inputs */
+        input, select {
+            padding: 8px 10px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 11px;
+        }
+        
+        input {
+            width: 100%;
+        }
+        
+        select {
+            min-width: 120px;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        
+        /* Button styles */
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--purple));
+            color: white;
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-refresh {
+            background: var(--green);
+            color: white;
+        }
+        
+        .btn-sm {
+            padding: 3px 7px;
+            font-size: 8px;
+        }
+        
+        .btn-danger {
+            background: var(--red);
+            color: white;
+        }
+        
+        .btn-success {
+            background: var(--green);
+            color: white;
+        }
+        
+        .btn-orange {
+            background: var(--orange);
+            color: white;
+        }
+        
+        /* Status message boxes */
+        .status {
+            padding: 6px;
+            border-radius: 5px;
+            text-align: center;
+            margin-top: 8px;
+            font-size: 10px;
+        }
+        
+        .status-info {
+            background: rgba(59,130,246,0.15);
+            color: var(--blue);
+        }
+        
+        .status-success {
+            background: rgba(16,185,129,0.15);
+            color: var(--green);
+        }
+        
+        .status-error {
+            background: rgba(239,68,68,0.15);
+            color: var(--red);
+        }
+        
+        /* Grid layouts */
+        .grid {
+            display: grid;
+            gap: 8px;
+        }
+        
+        .grid-2 {
+            grid-template-columns: 1fr 1fr;
+        }
+        
+        .grid-3 {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+        
+        .grid-4 {
+            grid-template-columns: repeat(4, 1fr);
+        }
+        
+        /* Stat card component */
+        .stat-card {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .stat-label {
+            font-size: 8px;
+            color: var(--dim);
+            text-transform: uppercase;
+        }
+        
+        /* Grade badge */
+        .grade {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border-radius: 5px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+        
+        .grade-a { background: rgba(16,185,129,0.2); color: var(--green); }
+        .grade-b { background: rgba(59,130,246,0.2); color: var(--blue); }
+        .grade-c { background: rgba(245,158,11,0.2); color: var(--yellow); }
+        .grade-d { background: rgba(239,68,68,0.2); color: var(--red); }
+        
+        /* Table styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9px;
+        }
+        
+        th {
+            text-align: left;
+            padding: 5px 4px;
+            background: rgba(99,102,241,0.1);
+            font-size: 8px;
+            text-transform: uppercase;
+            color: #818cf8;
+        }
+        
+        td {
+            padding: 5px 4px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        tr:hover {
+            background: rgba(40,40,70,0.5);
+        }
+        
+        tr.clickable {
+            cursor: pointer;
+        }
+        
+        /* Special row styles */
+        .row-fraud {
+            background: rgba(239,68,68,0.08) !important;
+        }
+        
+        .row-sleeper {
+            background: rgba(16,185,129,0.08) !important;
+        }
+        
+        .row-picked {
+            opacity: 0.3;
+            text-decoration: line-through;
+        }
+        
+        .row-rated {
+            border-left: 3px solid var(--orange);
+        }
+        
+        /* Badge component */
+        .badge {
+            display: inline-block;
+            padding: 2px 5px;
+            border-radius: 6px;
+            font-size: 8px;
+            font-weight: 600;
+        }
+        
+        .badge-green { background: rgba(16,185,129,0.2); color: var(--green); }
+        .badge-blue { background: rgba(59,130,246,0.2); color: var(--blue); }
+        .badge-yellow { background: rgba(245,158,11,0.2); color: var(--yellow); }
+        .badge-red { background: rgba(239,68,68,0.2); color: var(--red); }
+        .badge-purple { background: rgba(139,92,246,0.2); color: var(--purple); }
+        .badge-cyan { background: rgba(6,182,212,0.2); color: var(--cyan); }
+        .badge-orange { background: rgba(249,115,22,0.2); color: var(--orange); }
+        
+        /* Tier sections for pick recommendations */
+        .tier {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            border-left: 3px solid;
+        }
+        
+        .tier-a { background: rgba(16,185,129,0.05); border-color: var(--green); }
+        .tier-b { background: rgba(59,130,246,0.05); border-color: var(--blue); }
+        .tier-c { background: rgba(245,158,11,0.05); border-color: var(--yellow); }
+        
+        .tier-title {
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+        
+        /* Recommended pick highlight */
+        .recommended {
+            background: rgba(16,185,129,0.1);
+            border: 1px solid var(--green);
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        
+        /* Sleeper card styling */
+        .sleeper-card {
+            background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(6,182,212,0.1));
+            border: 1px solid var(--green);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+            cursor: pointer;
+        }
+        
+        .sleeper-card:hover {
+            border-color: var(--cyan);
+        }
+        
+        .sleeper-reason {
+            display: inline-block;
+            padding: 2px 6px;
+            background: rgba(16,185,129,0.15);
+            border-radius: 4px;
+            font-size: 8px;
+            margin: 1px;
+            color: var(--green);
+        }
+        
+        /* Modal overlay and dialog */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 10px;
+        }
+        
+        .modal {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            background: var(--card);
+            z-index: 10;
+        }
+        
+        .modal-title {
+            font-size: 16px;
+            font-weight: 700;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--dim);
+            font-size: 20px;
+            cursor: pointer;
+        }
+        
+        .modal-body {
+            padding: 12px;
+        }
+        
+        .modal-section {
+            margin-bottom: 14px;
+        }
+        
+        .modal-section-title {
+            font-size: 11px;
+            font-weight: 700;
+            margin-bottom: 5px;
+            color: var(--accent);
+        }
+        
+        /* NEW v11: Rating stars for manual ratings */
+        .rating-stars {
+            display: flex;
+            gap: 4px;
+            margin: 8px 0;
+        }
+        
+        .star {
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: rgba(0,0,0,0.2);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        
+        .star:hover {
+            background: rgba(249,115,22,0.3);
+            border-color: var(--orange);
+        }
+        
+        .star.active {
+            background: var(--orange);
+            color: white;
+            border-color: var(--orange);
+        }
+        
+        /* NEW v11: Head-to-head display */
+        .h2h-card {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+        
+        .h2h-result {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+            margin-top: 6px;
+            font-size: 10px;
+        }
+        
+        /* Progress bar for loading */
+        .progress-bar {
+            height: 5px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--purple));
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+        
+        /* Refresh bar at top of data views */
+        .refresh-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 9px;
+        }
+        
+        /* NEW v11: Elim performance badges */
+        .elim-badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 8px;
+            font-weight: 600;
+        }
+        
+        .elim-champ { background: rgba(16,185,129,0.2); color: var(--green); }
+        .elim-winner { background: rgba(6,182,212,0.2); color: var(--cyan); }
+        .elim-choker { background: rgba(239,68,68,0.2); color: var(--red); }
+        
+        /* Live tracking dot animation */
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--red);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+            display: inline-block;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+    </style>
+</head>
+<body>
+<!-- React app mounts here -->
+<div id="root"></div>
+
+<!-- Main React Application -->
+<script type="text/babel">
+/*
+ * REACT APPLICATION FOR VEX SCOUT v11
+ * ===================================
+ * This is a single-page application using React hooks (useState, useEffect)
+ * for state management and side effects.
+ */
+
+// Destructure hooks from React
+const { useState, useEffect } = React;
+
+/*
+ * HELPER FUNCTIONS
+ * ================
+ */
+
+// Returns CSS class for grade badge based on letter grade
+const getGradeClass = (grade) => {
+    if (!grade) return 'grade-c';
+    if (grade[0] === 'A') return 'grade-a';
+    if (grade[0] === 'B') return 'grade-b';
+    if (grade[0] === 'C') return 'grade-c';
+    return 'grade-d';
+};
+
+// Returns CSS class for elim performance label
+const getElimClass = (label) => {
+    if (label?.includes('Champ')) return 'elim-champ';
+    if (label?.includes('Winner')) return 'elim-winner';
+    if (label?.includes('Choke')) return 'elim-choker';
+    return '';
+};
+
+/*
+ * MAIN APP COMPONENT
+ * ==================
+ */
+const App = () => {
+    // =============================
+    // STATE VARIABLES
+    // =============================
+    
+    // UI State
+    const [tab, setTab] = useState('setup');           // Current active tab
+    const [loading, setLoading] = useState(false);     // Loading indicator
+    const [refreshing, setRefreshing] = useState(false); // Refresh indicator
+    const [status, setStatus] = useState('Enter event SKU to begin'); // Status message
+    const [progress, setProgress] = useState({ percent: 0, step: '' }); // Loading progress
+    const [modal, setModal] = useState(null);          // Team detail modal (null = closed)
+    const [lastRefresh, setLastRefresh] = useState(null); // Last refresh timestamp
+    
+    // Form Inputs
+    const [apiKey, setApiKey] = useState('');          // Optional custom API key
+    const [sku, setSku] = useState('');                // Event SKU (e.g., RE-V5RC-25-1234)
+    const [myTeam, setMyTeam] = useState('');          // User's team number
+    
+    // Data from API
+    const [data, setData] = useState(null);            // Full analysis data
+    const [picked, setPicked] = useState([]);          // Teams already picked
+    
+    // NEW v11: Manual ratings and head-to-head
+    const [ratings, setRatings] = useState({});        // {teamName: 1-10}
+    const [h2h, setH2h] = useState([]);                // [{winner, loser, round}]
+    const [h2hWinner, setH2hWinner] = useState('');    // H2H form: winner input
+    const [h2hLoser, setH2hLoser] = useState('');      // H2H form: loser input
+    const [h2hRound, setH2hRound] = useState('QF');    // H2H form: round select
+
+    // =============================
+    // EFFECTS (Side Effects)
+    // =============================
+    
+    // Poll for progress updates while loading
+    useEffect(() => {
+        let interval;
+        if (loading || refreshing) {
+            interval = setInterval(async () => {
+                try {
+                    const response = await fetch('/api/progress');
+                    const data = await response.json();
+                    setProgress(data);
+                } catch (e) {
+                    // Ignore errors during polling
+                }
+            }, 500); // Poll every 500ms
+        }
+        return () => clearInterval(interval); // Cleanup on unmount
+    }, [loading, refreshing]);
+
+    // Load existing ratings on mount
+    useEffect(() => {
+        fetch('/api/ratings')
+            .then(r => r.json())
+            .then(d => {
+                setRatings(d.ratings || {});
+                setH2h(d.h2h || []);
+            })
+            .catch(() => {});
+    }, []);
+
+    // =============================
+    // API FUNCTIONS
+    // =============================
+    
+    /*
+     * Analyzes an event - main action
+     */
+    const analyze = async () => {
+        if (!sku) {
+            setStatus('❌ Please enter an event SKU');
+            return;
+        }
+        
+        setLoading(true);
+        setStatus('⏳ Analyzing event...');
+        setPicked([]);
+        
+        try {
+            const response = await fetch('/api/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ apiKey, eventSku: sku, myTeam })
+            });
+            
+            const result = await response.json();
+            
+            if (result.error) {
+                setStatus('❌ ' + result.error);
+            } else {
+                setData(result);
+                setRatings(result.manualRatings || {});
+                setH2h(result.headToHead || []);
+                setStatus('✅ Analysis complete!');
+                setTab('leaderboard');
+                setLastRefresh(new Date());
+            }
+        } catch (e) {
+            setStatus('❌ Error: ' + e.message);
+        }
+        
+        setLoading(false);
+    };
+
+    /*
+     * Refreshes data without re-entering settings
+     */
+    const refresh = async () => {
+        setRefreshing(true);
+        
+        try {
+            const response = await fetch('/api/refresh', { method: 'POST' });
+            const result = await response.json();
+            
+            if (!result.error) {
+                setData(result);
+                setRatings(result.manualRatings || {});
+                setH2h(result.headToHead || []);
+                setLastRefresh(new Date());
+            }
+        } catch (e) {
+            console.error('Refresh failed:', e);
+        }
+        
+        setRefreshing(false);
+    };
+
+    /*
+     * NEW v11: Saves a manual rating for a team
+     */
+    const rateTeam = async (team, rating) => {
+        try {
+            const response = await fetch('/api/rate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ team, rating })
+            });
+            
+            const result = await response.json();
+            if (result.ratings) {
+                setRatings(result.ratings);
+            }
+        } catch (e) {
+            console.error('Rating failed:', e);
+        }
+    };
+
+    /*
+     * NEW v11: Adds a head-to-head result
+     */
+    const addH2h = async () => {
+        if (!h2hWinner || !h2hLoser) return;
+        
+        try {
+            const response = await fetch('/api/h2h', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    winner: h2hWinner, 
+                    loser: h2hLoser, 
+                    round: h2hRound 
+                })
+            });
+            
+            const result = await response.json();
+            if (result.h2h) {
+                setH2h(result.h2h);
+                setH2hWinner('');
+                setH2hLoser('');
+            }
+        } catch (e) {
+            console.error('H2H add failed:', e);
+        }
+    };
+
+    /*
+     * Clears all head-to-head records
+     */
+    const clearH2h = async () => {
+        try {
+            await fetch('/api/h2h/clear', { method: 'POST' });
+            setH2h([]);
+        } catch (e) {
+            console.error('H2H clear failed:', e);
+        }
+    };
+
+    /*
+     * Toggles a team as picked/unpicked
+     */
+    const togglePick = async (team, event) => {
+        event?.stopPropagation(); // Prevent row click
+        
+        try {
+            const endpoint = picked.includes(team) ? '/api/unpick' : '/api/pick';
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ team })
+            });
+            
+            const result = await response.json();
+            setPicked(result.picked || []);
+        } catch (e) {
+            console.error('Pick toggle failed:', e);
+        }
+    };
+
+    /*
+     * Resets all picks
+     */
+    const resetPicks = async () => {
+        await fetch('/api/reset', { method: 'POST' });
+        setPicked([]);
+    };
+
+    // Filter out picked teams from a list
+    const getAvailable = (teams) => teams?.filter(t => !picked.includes(t.Team)) || [];
+
+    // =============================
+    // SUB-COMPONENTS
+    // =============================
+    
+    /*
+     * Table row component for team data
+     */
+    const TeamRow = ({ team, showPick, rank, showElim }) => (
+        <tr 
+            className={`clickable 
+                ${team.Is_Fraud ? 'row-fraud' : ''} 
+                ${team.Is_Sleeper ? 'row-sleeper' : ''} 
+                ${picked.includes(team.Team) ? 'row-picked' : ''} 
+                ${ratings[team.Team] ? 'row-rated' : ''}`}
+            onClick={() => setModal(team)}
+        >
+            {/* AI Rank column */}
+            {rank !== undefined && (
+                <td>
+                    <strong style={{ color: 'var(--accent)' }}>#{rank + 1}</strong>
+                </td>
+            )}
+            
+            {/* Pick button column */}
+            {showPick && (
+                <td onClick={e => e.stopPropagation()}>
+                    <button 
+                        className={`btn btn-sm ${picked.includes(team.Team) ? 'btn-success' : 'btn-danger'}`}
+                        onClick={e => togglePick(team.Team, e)}
+                    >
+                        {picked.includes(team.Team) ? '↩' : '✕'}
+                    </button>
+                </td>
+            )}
+            
+            {/* Team name with badges */}
+            <td>
+                <strong>{team.Team}</strong>
+                {team.Is_Sleeper && <span className="badge badge-green" style={{ marginLeft: '3px' }}>💎</span>}
+                {ratings[team.Team] && <span className="badge badge-orange" style={{ marginLeft: '3px' }}>⭐{ratings[team.Team]}</span>}
+            </td>
+            
+            {/* Event rank */}
+            <td>#{team.Rank}</td>
+            
+            {/* Grade */}
+            <td>
+                <span className={`grade ${getGradeClass(team.Overall_Grade)}`}>
+                    {team.Overall_Grade}
+                </span>
+            </td>
+            
+            {/* TrueSkill */}
+            <td>{team.TrueSkill_Mu}</td>
+            
+            {/* Skills */}
+            <td>{team.Skills || '-'}</td>
+            
+            {/* NEW v11: Elim record */}
+            {showElim && (
+                <td>
+                    <span className={`elim-badge ${getElimClass(team.Elim_Label)}`}>
+                        {team.Elim_Record}
+                    </span>
+                </td>
+            )}
+            
+            {/* OPR */}
+            <td>{team.OPR}</td>
+            
+            {/* Ceiling */}
+            <td>{team.Ceiling}</td>
+            
+            {/* Overall Score */}
+            <td><strong>{team.Overall_Score}</strong></td>
+        </tr>
+    );
+
+    /*
+     * Tier section component (for pick recommendations)
+     */
+    const Tier = ({ title, teams, tierClass, showPick }) => {
+        const available = getAvailable(teams);
+        if (!teams?.length) return null;
+        
+        return (
+            <div className={`tier ${tierClass}`}>
+                <div className="tier-title">{title} ({available.length}/{teams.length})</div>
+                <div style={{ overflowX: 'auto' }}>
+                    <table>
+                        <thead>
+                            <tr>
+                                {showPick && <th></th>}
+                                <th>Team</th>
+                                <th>Rk</th>
+                                <th>Grd</th>
+                                <th>TS</th>
+                                <th>Skl</th>
+                                <th>Elim</th>
+                                <th>OPR</th>
+                                <th>Ceil</th>
+                                <th>Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {teams.map((t, i) => (
+                                <TeamRow key={i} team={t} showPick={showPick} showElim={true} />
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+    };
+
+    /*
+     * NEW v11: Rating stars component
+     */
+    const RatingStars = ({ team, current }) => (
+        <div className="rating-stars">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                <div 
+                    key={n}
+                    className={`star ${current >= n ? 'active' : ''}`}
+                    onClick={() => rateTeam(team, current === n ? 0 : n)}
+                    title={current === n ? 'Click to remove rating' : `Rate ${n}/10`}
+                >
+                    {n}
+                </div>
+            ))}
+        </div>
+    );
+
+    /*
+     * Team detail modal component
+     */
+    const TeamModal = ({ team }) => {
+        if (!team) return null;
+        
+        // Get H2H results for this team
+        const teamH2h = h2h.filter(h => 
+            h.winner === team.Team || h.loser === team.Team
+        );
+        
+        return (
+            <div className="modal-overlay" onClick={() => setModal(null)}>
+                <div className="modal" onClick={e => e.stopPropagation()}>
+                    {/* Modal Header */}
+                    <div className="modal-header">
+                        <div>
+                            <div className="modal-title">
+                                {team.Team}
+                                {team.Is_Sleeper && <span className="badge badge-green" style={{ marginLeft: '6px' }}>💎 SLEEPER</span>}
+                                {team.Is_Fraud && <span className="badge badge-red" style={{ marginLeft: '6px' }}>⚠️ FRAUD</span>}
+                            </div>
+                            <div style={{ color: 'var(--dim)', fontSize: '9px' }}>
+                                #{team.Rank} • {team.Record} • Elim: {team.Elim_Record}
+                            </div>
+                        </div>
+                        <button className="modal-close" onClick={() => setModal(null)}>×</button>
+                    </div>
+                    
+                    {/* Modal Body */}
+                    <div className="modal-body">
+                        {/* NEW v11: Manual Rating Section */}
+                        <div className="modal-section">
+                            <div className="modal-section-title">⭐ Your Rating (Overrides AI)</div>
+                            <RatingStars team={team.Team} current={ratings[team.Team] || 0} />
+                            {ratings[team.Team] && (
+                                <div style={{ fontSize: '9px', color: 'var(--orange)' }}>
+                                    You rated this team {ratings[team.Team]}/10 - AI score adjusted!
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Stats Grid */}
+                        <div className="modal-section">
+                            <div className="grid grid-4">
+                                <div className="stat-card">
+                                    <div className="stat-value" style={{ color: 'var(--accent)' }}>{team.Overall_Grade}</div>
+                                    <div className="stat-label">Grade</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-value" style={{ color: 'var(--purple)' }}>{team.TrueSkill_Mu}</div>
+                                    <div className="stat-label">TrueSkill</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-value" style={{ color: 'var(--cyan)' }}>{team.Skills || 0}</div>
+                                    <div className="stat-label">Skills</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-value" style={{ color: 'var(--orange)' }}>{team.Ceiling}</div>
+                                    <div className="stat-label">Ceiling</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* NEW v11: Elim Stats */}
+                        <div className="modal-section">
+                            <div className="grid grid-4">
+                                <div className="stat-card">
+                                    <div className="stat-value">{team.Elim_Wins || 0}</div>
+                                    <div className="stat-label">Elim Wins</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-value">{team.Elim_Losses || 0}</div>
+                                    <div className="stat-label">Elim Losses</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-value">{team.Auto}</div>
+                                    <div className="stat-label">Auto</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-value">{team.Blowout_Wins || 0}</div>
+                                    <div className="stat-label">Blowouts</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Labels */}
+                        <div className="modal-section">
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                <span className="badge badge-blue">{team.Play_Style}</span>
+                                <span className="badge badge-purple">{team.Pressure}</span>
+                                <span className="badge badge-cyan">{team.Momentum}</span>
+                                <span className={`badge ${getElimClass(team.Elim_Label)}`}>{team.Elim_Label}</span>
+                            </div>
+                        </div>
+                        
+                        {/* NEW v11: H2H Results */}
+                        {teamH2h.length > 0 && (
+                            <div className="modal-section">
+                                <div className="modal-section-title">⚔️ Head-to-Head Results</div>
+                                {teamH2h.map((h, i) => (
+                                    <div key={i} className="h2h-result">
+                                        <span style={{ color: h.winner === team.Team ? 'var(--green)' : 'var(--red)' }}>
+                                            {h.winner === team.Team ? '✅ Beat' : '❌ Lost to'}
+                                        </span>
+                                        <strong>{h.winner === team.Team ? h.loser : h.winner}</strong>
+                                        <span style={{ color: 'var(--dim)' }}>in {h.round}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        
+                        {/* Sleeper Reasons */}
+                        {team.Is_Sleeper && team.Sleeper_Reasons?.length > 0 && (
+                            <div className="modal-section">
+                                <div className="modal-section-title" style={{ color: 'var(--green)' }}>💎 Why They're A Sleeper</div>
+                                {team.Sleeper_Reasons.map((r, i) => (
+                                    <span key={i} className="sleeper-reason">{r}</span>
+                                ))}
+                            </div>
+                        )}
+                        
+                        {/* Fraud Flags */}
+                        {team.Is_Fraud && team.Fraud_Flags?.length > 0 && (
+                            <div className="modal-section" style={{ background: 'rgba(239,68,68,0.1)', padding: '8px', borderRadius: '6px' }}>
+                                <div className="modal-section-title" style={{ color: 'var(--red)' }}>⚠️ Red Flags</div>
+                                {team.Fraud_Flags.map((f, i) => (
+                                    <div key={i} style={{ fontSize: '9px', color: 'var(--red)', padding: '2px 0' }}>• {f}</div>
+                                ))}
+                            </div>
+                        )}
+                        
+                        {/* AI Notes */}
+                        {team.Auto_Notes?.length > 0 && (
+                            <div className="modal-section">
+                                <div className="modal-section-title">📝 AI Notes</div>
+                                {team.Auto_Notes.map((n, i) => (
+                                    <div key={i} style={{ fontSize: '9px', padding: '2px 0' }}>{n}</div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // =============================
+    // MAIN RENDER
+    // =============================
+    
+    return (
+        <div className="app">
+            {/* Team Detail Modal */}
+            {modal && <TeamModal team={modal} />}
+            
+            {/* Header */}
+            <div className="header">
+                <span className="title">🤖 VEX Scout</span>
+                <span className="version">v11 EYE TEST</span>
+                {data && (
+                    <div className="event-badge">📍 {data.eventName}</div>
+                )}
+            </div>
+            
+            {/* Main Card */}
+            <div className="card">
+                {/* Refresh Bar (shown when data is loaded) */}
+                {data && (
+                    <div className="refresh-bar">
+                        <span style={{ color: 'var(--dim)' }}>
+                            Updated: {lastRefresh?.toLocaleTimeString() || '-'} • 
+                            {Object.keys(ratings).length} rated • 
+                            {h2h.length} H2H
+                        </span>
+                        <button 
+                            className="btn btn-refresh btn-sm" 
+                            onClick={refresh} 
+                            disabled={refreshing}
+                        >
+                            {refreshing ? '⏳' : '🔄 Refresh'}
+                        </button>
+                    </div>
+                )}
+                
+                {/* Tab Navigation */}
+                <div className="tabs">
+                    <button className={`tab ${tab === 'setup' ? 'active' : ''}`} onClick={() => setTab('setup')}>⚙️ Setup</button>
+                    <button className={`tab ${tab === 'leaderboard' ? 'active' : ''}`} onClick={() => setTab('leaderboard')} disabled={!data}>📊 Leaderboard</button>
+                    <button className={`tab ${tab === 'sleepers' ? 'active' : ''}`} onClick={() => setTab('sleepers')} disabled={!data}>💎 Sleepers</button>
+                    <button className={`tab ${tab === 'picks' ? 'active' : ''}`} onClick={() => setTab('picks')} disabled={!data}>🎯 Picks</button>
+                    <button className={`tab ${tab === 'live' ? 'active' : ''}`} onClick={() => setTab('live')} disabled={!data}>🔴 Live</button>
+                    <button className={`tab ${tab === 'h2h' ? 'active' : ''}`} onClick={() => setTab('h2h')} disabled={!data}>⚔️ H2H</button>
+                    <button className={`tab ${tab === 'frauds' ? 'active' : ''}`} onClick={() => setTab('frauds')} disabled={!data}>⚠️ Frauds</button>
+                </div>
+                
+                {/* ==================== SETUP TAB ==================== */}
+                {tab === 'setup' && (
+                    <div>
+                        <div className="grid grid-2" style={{ marginBottom: '8px' }}>
+                            <div>
+                                <label style={{ fontSize: '8px', color: 'var(--dim)' }}>API Key (optional)</label>
+                                <input 
+                                    type="password" 
+                                    value={apiKey} 
+                                    onChange={e => setApiKey(e.target.value)}
+                                    placeholder="Leave blank to use default"
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '8px', color: 'var(--dim)' }}>Event SKU *</label>
+                                <input 
+                                    placeholder="RE-V5RC-25-XXXX" 
+                                    value={sku} 
+                                    onChange={e => setSku(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div style={{ marginBottom: '8px' }}>
+                            <label style={{ fontSize: '8px', color: 'var(--dim)' }}>Your Team (for synergy calculations)</label>
+                            <input 
+                                placeholder="e.g. 8568A" 
+                                value={myTeam} 
+                                onChange={e => setMyTeam(e.target.value)}
+                            />
+                        </div>
+                        <button 
+                            className="btn btn-primary" 
+                            onClick={analyze} 
+                            disabled={loading}
+                            style={{ width: '100%' }}
+                        >
+                            {loading ? '⏳ Analyzing...' : '🚀 Analyze Event'}
+                        </button>
+                        
+                        {/* Progress Bar */}
+                        {loading && (
+                            <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', marginTop: '6px' }}>
+                                    <span>{progress.step}</span>
+                                    <span>{progress.percent}%</span>
+                                </div>
+                                <div className="progress-bar">
+                                    <div className="progress-fill" style={{ width: `${progress.percent}%` }}></div>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* Status Message */}
+                        {!loading && (
+                            <div className={`status ${status.includes('✅') ? 'status-success' : status.includes('❌') ? 'status-error' : 'status-info'}`}>
+                                {status}
+                            </div>
+                        )}
+                    </div>
+                )}
+                
+                {/* ==================== LEADERBOARD TAB ==================== */}
+                {tab === 'leaderboard' && data && (
+                    <div>
+                        <h3 style={{ fontSize: '13px', marginBottom: '6px' }}>
+                            📊 AI Leaderboard 
+                            <span style={{ fontSize: '9px', color: 'var(--dim)', fontWeight: 'normal', marginLeft: '8px' }}>
+                                ({data.leaderboard?.length} teams, frauds excluded)
+                            </span>
+                        </h3>
+                        <div style={{ overflowX: 'auto' }}>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Team</th>
+                                        <th>Rk</th>
+                                        <th>Grd</th>
+                                        <th>TS</th>
+                                        <th>Skl</th>
+                                        <th>Elim</th>
+                                        <th>OPR</th>
+                                        <th>Ceil</th>
+                                        <th>Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {data.leaderboard?.slice(0, 50).map((t, i) => (
+                                        <TeamRow key={i} team={t} rank={i} showElim={true} />
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+                
+                {/* ==================== SLEEPERS TAB ==================== */}
+                {tab === 'sleepers' && data && (
+                    <div>
+                        <h3 style={{ fontSize: '13px', marginBottom: '4px' }}>💎 Sleeper Picks</h3>
+                        <p style={{ fontSize: '9px', color: 'var(--dim)', marginBottom: '10px' }}>
+                            Underrated teams that could cause upsets (like the #17 seed that won!)
+                        </p>
+                        {data.sleepers?.length > 0 ? (
+                            data.sleepers.map((t, i) => (
+                                <div key={i} className="sleeper-card" onClick={() => setModal(t)}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div>
+                                            <strong style={{ fontSize: '13px' }}>{t.Team}</strong>
+                                            <span style={{ color: 'var(--dim)', fontSize: '10px', marginLeft: '8px' }}>
+                                                Rank #{t.Rank}
+                                            </span>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <span className={`grade ${getGradeClass(t.Overall_Grade)}`}>{t.Overall_Grade}</span>
+                                            <div style={{ fontSize: '9px', color: 'var(--dim)' }}>
+                                                Sleeper: {t.Sleeper_Score}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '10px', marginTop: '6px', fontSize: '9px' }}>
+                                        <span>TS: <strong>{t.TrueSkill_Mu}</strong></span>
+                                        <span>Skills: <strong>{t.Skills || 0}</strong></span>
+                                        <span>Ceiling: <strong>{t.Ceiling}</strong></span>
+                                        <span>Upsets: <strong>{t.Wins_vs_Higher || 0}</strong></span>
+                                    </div>
+                                    <div style={{ marginTop: '6px' }}>
+                                        {t.Sleeper_Reasons?.map((r, j) => (
+                                            <span key={j} className="sleeper-reason">{r}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--dim)' }}>
+                                No sleepers detected
+                            </div>
+                        )}
+                    </div>
+                )}
+                
+                {/* ==================== PICKS TAB ==================== */}
+                {tab === 'picks' && data && (
+                    <div>
+                        {/* Who Wants You */}
+                        {data.whoWantsYou?.length > 0 && (
+                            <div style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid var(--purple)', borderRadius: '6px', padding: '8px', marginBottom: '8px', fontSize: '10px' }}>
+                                <strong>🎯 Captains likely to pick you:</strong> {data.whoWantsYou.map(w => w.Captain).join(', ')}
+                            </div>
+                        )}
+                        
+                        <Tier title="🅰️ Best Picks" teams={data.tierA} tierClass="tier-a" />
+                        <Tier title="🅱️ Strong Options" teams={data.tierB} tierClass="tier-b" />
+                        <Tier title="🆘 Backup Options" teams={data.tierC} tierClass="tier-c" />
+                        
+                        {/* Top Recommendation */}
+                        {data.recommended && (
+                            <div className="recommended" onClick={() => setModal(data.recommended)} style={{ cursor: 'pointer' }}>
+                                <div style={{ fontSize: '8px', color: 'var(--green)', textTransform: 'uppercase' }}>⭐ #1 Pick For You</div>
+                                <div style={{ fontSize: '16px', fontWeight: '800' }}>
+                                    {data.recommended.Team}
+                                    {data.recommended.Is_Sleeper && <span className="badge badge-green" style={{ marginLeft: '8px' }}>💎</span>}
+                                </div>
+                                <div style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '9px' }}>
+                                    <span>Grade: <strong>{data.recommended.Overall_Grade}</strong></span>
+                                    <span>TS: <strong>{data.recommended.TrueSkill_Mu}</strong></span>
+                                    <span>Skills: <strong>{data.recommended.Skills || 0}</strong></span>
+                                    <span>Elim: <strong>{data.recommended.Elim_Record}</strong></span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+                
+                {/* ==================== LIVE TRACKING TAB ==================== */}
+                {tab === 'live' && data && (
+                    <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <h3 style={{ fontSize: '12px' }}>
+                                <span className="live-dot"></span> Live Tracking
+                            </h3>
+                            <div>
+                                <span className="badge badge-red">{picked.length} picked</span>
+                                {picked.length > 0 && (
+                                    <button className="btn btn-sm" style={{ marginLeft: '4px' }} onClick={resetPicks}>
+                                        Reset
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        
+                        {/* Picked Teams */}
+                        {picked.length > 0 && (
+                            <div style={{ padding: '5px', background: 'rgba(239,68,68,0.1)', borderRadius: '4px', marginBottom: '6px', fontSize: '9px' }}>
+                                <strong>Gone:</strong> {picked.join(', ')}
+                            </div>
+                        )}
+                        
+                        {/* Best Available */}
+                        {getAvailable(data.allPickable)[0] && (
+                            <div style={{ padding: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid var(--green)', borderRadius: '6px', marginBottom: '8px' }}>
+                                <strong style={{ color: 'var(--green)', fontSize: '10px' }}>🎯 Best Available:</strong>
+                                <span 
+                                    style={{ fontWeight: '700', cursor: 'pointer', marginLeft: '8px' }}
+                                    onClick={() => setModal(getAvailable(data.allPickable)[0])}
+                                >
+                                    {getAvailable(data.allPickable)[0].Team}
+                                </span>
+                            </div>
+                        )}
+                        
+                        <Tier title="Available Teams" teams={data.allPickable} tierClass="tier-a" showPick={true} />
+                    </div>
+                )}
+                
+                {/* ==================== HEAD-TO-HEAD TAB (NEW v11) ==================== */}
+                {tab === 'h2h' && data && (
+                    <div>
+                        <h3 style={{ fontSize: '13px', marginBottom: '8px' }}>⚔️ Head-to-Head Tracker</h3>
+                        <p style={{ fontSize: '9px', color: 'var(--dim)', marginBottom: '10px' }}>
+                            Record elim match results. This data helps identify frauds who lost to lower seeds!
+                        </p>
+                        
+                        {/* H2H Entry Form */}
+                        <div className="h2h-card">
+                            <div className="modal-section-title">Add Result</div>
+                            <div className="grid grid-3" style={{ marginBottom: '8px' }}>
+                                <div>
+                                    <label style={{ fontSize: '8px', color: 'var(--dim)' }}>Winner</label>
+                                    <input 
+                                        placeholder="e.g. 8568A"
+                                        value={h2hWinner}
+                                        onChange={e => setH2hWinner(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ fontSize: '8px', color: 'var(--dim)' }}>Loser</label>
+                                    <input 
+                                        placeholder="e.g. 10102C"
+                                        value={h2hLoser}
+                                        onChange={e => setH2hLoser(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ fontSize: '8px', color: 'var(--dim)' }}>Round</label>
+                                    <select value={h2hRound} onChange={e => setH2hRound(e.target.value)}>
+                                        <option value="QF">Quarterfinals</option>
+                                        <option value="SF">Semifinals</option>
+                                        <option value="Finals">Finals</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button className="btn btn-primary btn-sm" onClick={addH2h}>
+                                ➕ Add Result
+                            </button>
+                        </div>
+                        
+                        {/* H2H Results List */}
+                        <div style={{ marginTop: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                <div className="modal-section-title">Recorded Results ({h2h.length})</div>
+                                {h2h.length > 0 && (
+                                    <button className="btn btn-danger btn-sm" onClick={clearH2h}>
+                                        Clear All
+                                    </button>
+                                )}
+                            </div>
+                            {h2h.length > 0 ? (
+                                h2h.map((h, i) => (
+                                    <div key={i} className="h2h-result">
+                                        <span style={{ color: 'var(--green)' }}>✅ {h.winner}</span>
+                                        <span style={{ color: 'var(--dim)' }}>beat</span>
+                                        <span style={{ color: 'var(--red)' }}>❌ {h.loser}</span>
+                                        <span style={{ color: 'var(--dim)' }}>in {h.round}</span>
+                                    </div>
+                                ))
+                            ) : (
+                                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--dim)', fontSize: '10px' }}>
+                                    No results recorded yet. Add elim match results above!
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+                
+                {/* ==================== FRAUDS TAB ==================== */}
+                {tab === 'frauds' && data && (
+                    <div>
+                        <h3 style={{ fontSize: '13px', color: 'var(--red)', marginBottom: '6px' }}>
+                            ⚠️ Fraud Alert ({data.frauds?.length || 0})
+                        </h3>
+                        <p style={{ fontSize: '9px', color: 'var(--dim)', marginBottom: '8px' }}>
+                            High-ranked teams that will probably choke in elims. Avoid picking these!
+                        </p>
+                        {data.frauds?.length > 0 ? (
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Team</th>
+                                        <th>Rank</th>
+                                        <th>Elim</th>
+                                        <th>Red Flags</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {data.frauds.map((t, i) => (
+                                        <tr key={i} className="clickable row-fraud" onClick={() => setModal(t)}>
+                                            <td><strong>{t.Team}</strong></td>
+                                            <td>#{t.Rank}</td>
+                                            <td>{t.Elim_Record}</td>
+                                            <td style={{ fontSize: '8px' }}>{t.Fraud_Flags?.join(' • ')}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--green)' }}>
+                                ✅ No frauds detected!
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+            
+            {/* Footer */}
+            <div style={{ textAlign: 'center', padding: '10px', color: 'var(--dim)', fontSize: '8px' }}>
+                VEX Scout v11 • Eye Test Edition • Built for VEX Think Award
+            </div>
+        </div>
+    );
+};
+
+// Mount the React app to the DOM
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
