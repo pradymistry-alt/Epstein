@@ -51,7 +51,7 @@
     performance, consistency (standard deviation), clutch performance in close
     games, and trend analysis (improving vs declining).
 
- AUTHOR: Built with Claude AI assistance
+ AUTHOR: Prady M
  PURPOSE: VEX V5 Robotics Competition alliance selection
  SEASON: 2025-2026 Push Back
 ================================================================================
